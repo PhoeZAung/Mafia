@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MAFIA: Neon Night</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <style>
+        /* --- SLEEK NOIR HORROR THEME --- */
+        :root {
+            --bg-color: #000000;
+            --bg-gradient: radial-gradient(circle at center, #1a0505 0%, #000000 100%);
+            --card-bg: rgba(20, 20, 20, 0.95);
+            --border: 1px solid #3d0000;
+            --text-primary: #e0e0e0;
+            --accent-red: #c90000;
+            --accent-glow: 0 0 15px rgba(201, 0, 0, 0.4);
+            --villager: #4cd964; 
+            --neutral: #fca;
+            --mafia: #ff3b30;
+            --purple: #9b59b6;
+        }
+
+        body {
+            background: var(--bg-color);
+            background-image: var(--bg-gradient);
+            color: var(--text-primary);
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 450px;
+            height: 100%;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* TYPOGRAPHY */
+        h1, h2, h3 { font-family: 'Cinzel', serif; text-transform: uppercase; margin: 0; }
+        h1 { 
+            font-size: 42px; font-weight: 900; color: var(--accent-red); 
+            text-shadow: 0 0 20px rgba(201, 0, 0, 0.5); letter-spacing: 6px; 
+            text-align: center; margin-top: 40px; border-bottom: 2px solid #500; padding-bottom: 10px;
+        }
+        h2 { font-size: 24px; letter-spacing: 2px; color: #fff; margin-bottom: 20px;}
+        h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; letter-spacing: 1px; color: #aaa; }
+
+        /* UI ELEMENTS */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            padding: 24px; box-sizing: border-box; display: none;
+            flex-direction: column; gap: 16px; opacity: 0;
+            transition: opacity 0.4s ease; z-index: 10;
+            background: var(--bg-color);
+            overflow-y: auto;
+        }
+        .screen.active { display: flex; opacity: 1; }
+        
+        #screen-create, #screen-join { padding-top: 70px; }
+
+        .card {
+            background: var(--card-bg); border: var(--border);
+            border-radius: 6px; padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+        }
+
+        input {
+            background: #0a0a0a; border: 1px solid #333;
+            border-radius: 4px; padding: 16px; color: white;
+            font-family: 'Montserrat', sans-serif; font-size: 16px;
+            width: 100%; box-sizing: border-box; outline: none; margin-bottom: 10px;
+        }
+        input:focus { border-color: var(--accent-red); background: #111; }
+
+        button {
+            background: linear-gradient(180deg, var(--accent-red) 0%, #630000 100%);
+            color: white; border: none; border-radius: 4px;
+            padding: 16px; font-family: 'Cinzel', serif; font-size: 16px;
+            font-weight: 700; letter-spacing: 1px; width: 100%;
+            cursor: pointer; text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 10px;
+        }
+        button:active { transform: scale(0.98); opacity: 0.9; }
+        
+        button.secondary { background: transparent; border: 1px solid #444; color: #888; box-shadow: none; }
+        button.outline { background: transparent; border: 1px solid var(--accent-red); color: var(--accent-red); box-shadow: none; }
+        button.win-btn { font-size: 10px; padding: 12px 5px; margin: 0; white-space: nowrap;}
+        
+        /* SPECIAL BUTTONS */
+        button.surgeon-heal { background: var(--villager); color: #000; box-shadow: 0 0 10px var(--villager); }
+        button.surgeon-kill { background: var(--purple); color: #fff; box-shadow: 0 0 10px var(--purple); }
+
+        /* TIMER */
+        .timer-container {
+            background: #111; border: 1px solid #444; padding: 10px;
+            border-radius: 4px; text-align: center; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .timer-display { font-family: 'Cinzel', serif; font-size: 24px; color: #fff; font-weight: 900; }
+        .timer-controls button { width: auto; padding: 5px 10px; font-size: 12px; margin: 0 2px; }
+
+        /* ROLE SELECTOR */
+        .role-list-container { overflow-y: auto; flex-grow: 1; padding-right: 5px; }
+        .role-header { 
+            background: #222; padding: 8px; font-size: 12px; font-weight: bold; 
+            letter-spacing: 1px; margin-top: 10px; border-left: 3px solid #555;
+        }
+        .role-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #111; border-bottom: 1px solid #222;
+            padding: 10px; 
+        }
+        .role-name { font-size: 14px; font-weight: 600; flex-grow: 1; margin-left: 10px; }
+        .role-controls { display: flex; align-items: center; gap: 10px; }
+        .ctrl-btn { 
+            width: 30px; height: 30px; padding: 0; display: flex; 
+            align-items: center; justify-content: center; font-size: 20px; 
+            background: #222; margin: 0;
+        }
+        .info-icon {
+            color: #666; font-style: italic; font-family: serif; 
+            border: 1px solid #444; border-radius: 50%; width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center; font-size: 12px; cursor: pointer;
+        }
+
+        /* LOBBY & GAME LISTS */
+        .player-list { overflow-y: auto; flex-grow: 1; }
+        .player-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 5px; border-bottom: 1px solid #222;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #444; box-shadow: none; }
+        .status-dot.online { background: #4cd964; box-shadow: 0 0 5px #4cd964; }
+        .status-icon-offline { font-size: 12px; }
+
+        /* HOST DASHBOARD */
+        .current-role-display { 
+            background: radial-gradient(circle, #1a0000 0%, #000000 100%);
+            border: 1px solid var(--accent-red); box-shadow: var(--accent-glow);
+            padding: 20px; text-align: center; border-radius: 4px; margin-bottom: 15px;
+        }
+        .big-role-text { font-family: 'Cinzel', serif; font-size: 28px; color: var(--accent-red); font-weight: 700; margin: 10px 0; }
+        .host-actions-row { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+        .tiny-btn { font-size: 9px; padding: 4px 8px; width: auto; margin: 0; }
+
+        /* PLAYER CARD */
+        .player-card {
+            border: 1px solid #444; background: #111; padding: 40px 20px;
+            text-align: center; border-radius: 8px; position: relative;
+            margin-top: 20px; overflow: hidden;
+        }
+        .role-bg-icon {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 180px; opacity: 0.07; pointer-events: none; filter: grayscale(100%);
+        }
+        .role-reveal { font-family: 'Cinzel', serif; font-size: 32px; font-weight: 800; margin: 20px 0; position:relative; z-index:2; }
+        .role-type { 
+            font-size: 12px; text-transform: uppercase; letter-spacing: 2px; 
+            background: #222; padding: 5px 10px; border-radius: 10px; display: inline-block;
+            position:relative; z-index:2; border: 1px solid #333;
+        }
+        .role-desc { position:relative; z-index:2; margin-top:20px; font-size:14px; color:#aaa; line-height:1.4; }
+        .ability-btn {
+            background: #111; border: 1px solid var(--accent-red); color: var(--accent-red);
+            margin-top: 20px; transition: 0.3s; position:relative; z-index:2;
+        }
+        .ability-btn.active { background: var(--accent-red); color: white; box-shadow: 0 0 15px var(--accent-red); }
+        .ammo-display { font-size: 10px; color: #888; margin-top: 5px; letter-spacing: 1px; }
+
+        /* OVERLAYS */
+        .custom-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 2000; display: none;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal-box { 
+            background: #0f0f0f; border: 1px solid var(--accent-red); 
+            padding: 30px; width: 100%; max-width: 320px; text-align: center; 
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            max-height: 80vh; overflow-y: auto;
+        }
+        .win-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 3000; display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+            animation: popIn 0.5s ease-out;
+        }
+        .win-overlay.active { display: flex; }
+        .dead-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000000; z-index: 999; display: none;
+            justify-content: center; align-items: center; flex-direction: column;
+            pointer-events: none;
+        }
+        .dead-overlay.is-dead { display: flex; }
+        .dead-text { 
+            font-family: 'Cinzel', serif; color: #500; font-size: 48px; 
+            font-weight: 900; letter-spacing: 8px; text-shadow: 0 0 20px #ff0000;
+        }
+
+        /* FLOATING ACTION BUTTONS */
+        .fab-container {
+            position: fixed; bottom: 20px; right: 20px; display: flex; gap: 10px; z-index: 100;
+        }
+        .fab {
+            width: 50px; height: 50px; border-radius: 50%; border: 1px solid #444;
+            background: #111; color: #fff; font-size: 20px; display: flex;
+            align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        /* UTILS */
+        .hidden { display: none !important; }
+        .back-btn { 
+            position: absolute; top: 24px; left: 20px; 
+            background: none; width: auto; padding: 0; 
+            color: #666; font-size: 28px; box-shadow: none; 
+            border:none; z-index: 50; 
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes popIn { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="screen-home" class="screen active">
+        <h1>MAFIA</h1>
+        <p style="text-align:center; letter-spacing:2px; margin-top:-20px;">NEON NIGHT</p>
+        <div style="flex-grow:1"></div>
+        <button onclick="navTo('screen-create')">Create Room</button>
+        <button class="secondary" onclick="navTo('screen-join')">Join Room</button>
+        <div style="flex-grow:1"></div>
+    </div>
+
+    <div id="screen-create" class="screen">
+        <button class="back-btn" onclick="navTo('screen-home')">←</button>
+        <h2>Setup</h2>
+        <input type="text" id="host-room" placeholder="ROOM NAME" autocomplete="off">
+        <input type="text" id="host-pass" placeholder="PASSWORD" autocomplete="off">
+        
+        <div style="background:#111; padding:15px; border:1px solid #333; border-radius:4px; margin-bottom:15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0; color:#fff;">Auto-Assign</h3>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="random-count" placeholder="# Players" style="margin:0; padding:10px;">
+                <button class="outline" style="margin:0; padding:10px;" onclick="randomizeRoles()">Randomize</button>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+            <h3>Role Deck</h3>
+            <p id="total-role-count" style="font-size:12px">0 Selected</p>
+        </div>
+        
+        <div id="role-list" class="role-list-container custom-scroll"></div>
+        
+        <div style="display:flex; gap:10px; margin-top: 10px;">
+            <button class="secondary" style="flex:1" onclick="resetRoles()">Reset</button>
+            <button style="flex:2" onclick="createGame()">Open Lobby</button>
+        </div>
+    </div>
+
+    <div id="screen-join" class="screen">
+        <button class="back-btn" onclick="navTo('screen-home')">←</button>
+        <h2>Join Session</h2>
+        <div style="flex-grow:1; display:flex; flex-direction:column; justify-content:center; gap:10px;">
+            <input type="text" id="join-room" placeholder="ROOM NAME">
+            <input type="text" id="join-pass" placeholder="PASSWORD">
+            <input type="text" id="join-name" placeholder="YOUR NAME">
+        </div>
+        <button onclick="joinGame()">Enter</button>
+    </div>
+
+    <div id="screen-lobby" class="screen">
+        <h2 id="lobby-title" style="color:var(--accent-red)">Lobby</h2>
+        <div style="display:flex; justify-content: space-between; font-size:12px; color:#666; margin-bottom:10px;">
+            <span id="lobby-role-count">Roles: 0</span>
+            <span id="lobby-player-count">Players: 0</span>
+        </div>
+
+        <div class="card" style="flex-grow:1; display:flex; flex-direction:column;">
+            <div id="lobby-list" class="player-list"></div>
+        </div>
+
+        <div id="host-controls" class="hidden" style="display:flex; flex-direction:column; gap:10px; margin-top:10px;">
+            <button class="secondary" onclick="editRoles()">Edit Roles</button>
+            <button onclick="startGame()">Start Game</button>
+            <button class="secondary" onclick="confirmDeleteRoom()">Close Room</button>
+        </div>
+
+        <div id="player-lobby-controls" class="hidden" style="margin-top:10px;">
+            <button class="secondary" onclick="leaveLobby()">Leave Lobby</button>
+        </div>
+    </div>
+
+    <div id="screen-player" class="screen">
+        <div class="timer-container">
+            <span>TIMER:</span>
+            <span id="player-timer" class="timer-display">00:00</span>
+        </div>
+
+        <div class="player-card">
+            <div id="role-bg-icon" class="role-bg-icon">?</div>
+            <p style="font-size: 10px; color: #666; letter-spacing: 2px;">YOUR IDENTITY</p>
+            <div id="my-role-name" class="role-reveal">...</div>
+            <div id="my-role-type" class="role-type">...</div>
+            <p id="my-role-desc" class="role-desc">...</p>
+            
+            <button id="ability-btn" class="ability-btn hidden" onclick="toggleAbility()">REVEAL / USE ABILITY</button>
+            
+            <div id="surgeon-controls" class="hidden" style="display:flex; gap:5px; margin-top:20px; z-index:2; position:relative;">
+                <button id="btn-surg-heal" class="surgeon-heal" onclick="useSurgeon('heal')">Heal</button>
+                <button id="btn-surg-kill" class="surgeon-kill" onclick="useSurgeon('kill')">Poison</button>
+            </div>
+            
+            <p id="ammo-count" class="ammo-display hidden">USES LEFT: -</p>
+        </div>
+        <p style="text-align: center; font-size: 12px; color: #444; margin-top:20px;">Wait for Host instructions.</p>
+        
+        <div class="fab-container">
+            <div class="fab" onclick="showGraveyard()">💀</div>
+            <div class="fab" onclick="showWiki()">ℹ️</div>
+        </div>
+
+        <button class="secondary" style="margin-top:20px;" onclick="leaveLobby()">Quit Game</button>
+    </div>
+
+    <div id="screen-host" class="screen">
+        <div class="dashboard-header" style="text-align:center;">
+            <h3>Game Manager</h3>
+            <p id="game-status" style="color:var(--accent-red)">Night Phase</p>
+        </div>
+
+        <div class="timer-container" style="flex-direction:column; gap:5px;">
+            <span id="host-timer" class="timer-display">01:00</span>
+            <div class="timer-controls">
+                <button class="outline" onclick="modTimer(-15)">-15s</button>
+                <button onclick="startTimer()">RESET (1m)</button>
+                <button class="outline" onclick="modTimer(15)">+15s</button>
+            </div>
+        </div>
+
+        <div class="current-role-display">
+            <p style="font-size:10px; letter-spacing:2px; color:#555">CURRENT TURN</p>
+            <div id="host-current-role" class="big-role-text">...</div>
+            <p id="host-role-desc">...</p>
+        </div>
+
+        <button onclick="nextPhase()">Next Phase ➔</button>
+
+        <h3 style="margin-top:15px;">Live Status</h3>
+        <div id="host-player-list" class="player-list card" style="height: 150px;"></div>
+
+        <h3 style="margin-top:15px;">End Game</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">
+            <button class="win-btn outline" onclick="attemptWin('Mafia')">Mafia<br>Wins</button>
+            <button class="win-btn outline" style="border-color:var(--villager); color:var(--villager);" onclick="attemptWin('Town')">Town<br>Wins</button>
+            <button class="win-btn outline" style="border-color:var(--neutral); color:var(--neutral);" onclick="attemptWin('Neutral')">Neutral<br>Wins</button>
+        </div>
+    </div>
+
+    <div id="death-overlay" class="dead-overlay">
+        <div class="dead-text">DECEASED</div>
+        <p style="color:#666;">You have been eliminated.</p>
+        <div class="fab-container">
+            <div class="fab" onclick="showGraveyard()">💀</div>
+            <div class="fab" onclick="showWiki()">ℹ️</div>
+        </div>
+    </div>
+
+    <div id="global-win-overlay" class="win-overlay">
+        <div id="win-title-text" class="win-title" style="color:var(--accent-red); font-size: 42px; font-weight:900; letter-spacing:4px;">MAFIA WINS</div>
+        <div style="color:white; letter-spacing:2px; margin-bottom:30px;">GAME OVER</div>
+        
+        <button id="win-dismiss-host" class="secondary" style="width:150px; display:none;" onclick="closeWinOverlayHost()">End Session</button>
+        <button id="win-dismiss-player" class="secondary" style="width:150px; display:none;" onclick="closeWinOverlayPlayer()">Leave</button>
+    </div>
+
+    <div id="custom-modal" class="custom-modal">
+        <div class="modal-box">
+            <h2 id="c-modal-title" style="color:var(--accent-red); margin-bottom:15px;">Alert</h2>
+            <div id="c-modal-content" style="color:#ccc; margin-bottom:25px;">Message.</div>
+            <div id="c-modal-actions" style="display:flex; gap:10px; justify-content:center;">
+                <button id="btn-cancel" class="secondary" onclick="closeModal(false)">Cancel</button>
+                <button id="btn-confirm" onclick="closeModal(true)">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- FIREBASE CONFIG ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCvkcvKAj63Yaz0ZRJrskCsMsr5uoi2d4s",
+        authDomain: "mafia-61472.firebaseapp.com",
+        databaseURL: "https://mafia-61472-default-rtdb.firebaseio.com",
+        projectId: "mafia-61472",
+        storageBucket: "mafia-61472.firebasestorage.app",
+        messagingSenderId: "122685510130",
+        appId: "1:122685510130:web:7637cda263d333f478db6b",
+        measurementId: "G-W1FZWMDX8Z"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- GAME ROLES CONFIGURATION ---
+    // Priority defines the Night Order. 
+    // 0 = Start of Night
+    // 1-9 = Mafia Ability
+    // 10 = Mafia Kill
+    // 20-29 = Serial Killer
+    // 30-89 = Town Active
+    // 90+ = Passive/Day (Excluded from Night)
+
+    const ROLES_DEF = [
+        // --- MAFIA (RED) ---
+        { id: 'mafia_all', name: 'MAFIA TEAM', cat: 'mafia', faction: 'mafia', icon: '🔫', type: 'Nightly', priority: 1, desc: 'All Mafia wake up. Identify your team.', isMeta: true }, 
+        
+        { id: 'roleblocker', name: 'Mafia Roleblocker', cat: 'mafia', faction: 'mafia', icon: '🚫', type: 'Limited', priority: 2, desc: 'Block a player\'s ability tonight. (1 Use)', ammo: 1 },
+        { id: 'silencer', name: 'Mafia Silencer', cat: 'mafia', faction: 'mafia', icon: '🤐', type: 'Limited', priority: 3, desc: 'Select a target. They cannot speak tomorrow. (2 Uses)', ammo: 2 },
+        { id: 'framer', name: 'Mafia Framer', cat: 'mafia', faction: 'mafia', icon: '🖼️', type: 'Nightly', priority: 4, desc: 'Select a target. They will appear GUILTY to investigations.' },
+        
+        { id: 'godfather', name: 'Godfather', cat: 'mafia', faction: 'mafia', icon: '🕴️', type: 'Nightly', priority: 10, desc: 'Direct the kill. You appear innocent to detectives.' },
+        { id: 'mafia', name: 'Mafia Member', cat: 'mafia', faction: 'mafia', icon: '🔫', type: 'Nightly', priority: 10, desc: 'Wake up with Mafia. Execute the kill.' },
+        
+        { id: 'bomb', name: 'Mafia Bomb', cat: 'mafia', faction: 'mafia', icon: '💣', type: 'Limited', priority: 99, desc: 'If you die, you can take someone with you. (1 Use)', ammo: 1 },
+
+        // --- TOWN (GREEN) ---
+        { id: 'guardian', name: 'Guardian Angel', cat: 'town', faction: 'villager', icon: '👼', type: 'Limited', priority: 30, desc: 'Revive a player who died last night. (1 Use, Night Only)', ammo: 1 },
+        { id: 'surgeon', name: 'Surgeon', cat: 'town', faction: 'villager', icon: '💉', type: 'Limited', priority: 31, desc: 'You have 1 Heal (Green) and 1 Poison (Purple).', ammo: 1, ammo2: 1 }, 
+        { id: 'doctor', name: 'Doctor', cat: 'town', faction: 'villager', icon: '⚕️', type: 'Nightly', priority: 32, desc: 'Choose a player to heal. They cannot be killed tonight.' },
+        { id: 'bodyguard', name: 'Bodyguard', cat: 'town', faction: 'villager', icon: '🛡️', type: 'Nightly', priority: 33, desc: 'Protect a player. If attacked, you die instead of them.' },
+        { id: 'detective', name: 'Detective', cat: 'town', faction: 'villager', icon: '🔎', type: 'Nightly', priority: 34, desc: 'Investigate a player to see if they are suspicious.' },
+        { id: 'stalker', name: 'Stalker', cat: 'town', faction: 'villager', icon: '👁️', type: 'Nightly', priority: 35, desc: 'Watch a player to see who visits them.' },
+        
+        { id: 'sheriff', name: 'Sheriff', cat: 'town', faction: 'villager', icon: '⭐', type: 'Limited', priority: 99, desc: 'Day Ability: Kill a suspect. If innocent, you die. (1 Use)', ammo: 1 },
+        { id: 'mayor', name: 'Mayor', cat: 'town', faction: 'villager', icon: '🎩', type: 'Limited', priority: 99, desc: 'Reveal yourself to make your vote count as 2. (1 Use)', ammo: 1 },
+        { id: 'toughguy', name: 'Tough Guy', cat: 'town', faction: 'villager', icon: '💪', type: 'Passive', priority: 99, desc: 'You survive the first attempt on your life.' },
+        { id: 'villager', name: 'Civilian', cat: 'town', faction: 'villager', icon: '👤', type: 'Passive', priority: 99, desc: 'No abilities. Vote to eliminate the Mafia.' },
+        
+        // --- NEUTRAL (ORANGE) ---
+        { id: 'serialkiller', name: 'Serial Killer', cat: 'neutral', faction: 'neutral', icon: '🔪', type: 'Nightly', priority: 20, desc: 'Kill one player each night. Win if last standing.' },
+        { id: 'jester', name: 'Jester', cat: 'neutral', faction: 'neutral', icon: '🤡', type: 'Passive', priority: 99, desc: 'Trick the town into voting you out to win.' },
+        { id: 'executioner', name: 'Executioner', cat: 'neutral', faction: 'neutral', icon: '🪓', type: 'Nightly', priority: 0.1, desc: '(Night 1) Choose target. Win if they get voted out. Becomes Jester if target dies.' },
+        { id: 'lover', name: 'Lover', cat: 'neutral', faction: 'neutral', icon: '❤️', type: 'Nightly', priority: 0, desc: '(Night 1 Only) Wake up and identify your partner.' },
+    ];
+
+    let selectedRoles = {};
+    let myRoom = "";
+    let myName = "";
+    let isHost = false;
+    let timerInterval = null;
+    
+    // --- STARTUP / RECONNECT LOGIC ---
+    window.onload = function() {
+        const storedRoom = localStorage.getItem('mafia_room');
+        const storedName = localStorage.getItem('mafia_name');
+        const storedHost = localStorage.getItem('mafia_isHost');
+        const storedPass = localStorage.getItem('mafia_pass');
+
+        if(storedRoom && storedName && storedPass) {
+            console.log("Attempting reconnect...");
+            myRoom = storedRoom;
+            myName = storedName;
+            isHost = (storedHost === 'true');
+            
+            db.ref(`rooms/${myRoom}`).once('value', snapshot => {
+                if(snapshot.exists()) {
+                    const data = snapshot.val();
+                    if(data.password === storedPass) {
+                        db.ref(`rooms/${myRoom}/players/${myName}`).update({ isOnline: true });
+                        db.ref(`rooms/${myRoom}/players/${myName}`).onDisconnect().update({ isOnline: false });
+                        
+                        listenToRoom(myRoom);
+                        if(data.status === 'game' || data.status.startsWith('won')) {
+                             navTo(isHost ? 'screen-host' : 'screen-player');
+                        } else {
+                             navTo('screen-lobby');
+                             if(isHost) {
+                                document.getElementById('host-controls').classList.remove('hidden');
+                                document.getElementById('player-lobby-controls').classList.add('hidden');
+                             } else {
+                                document.getElementById('host-controls').classList.add('hidden');
+                                document.getElementById('player-lobby-controls').classList.remove('hidden');
+                             }
+                        }
+                        document.getElementById('lobby-title').innerText = myRoom;
+                    } else {
+                        clearStorage();
+                    }
+                } else {
+                    clearStorage();
+                }
+            });
+        }
+    };
+
+    function clearStorage() {
+        localStorage.removeItem('mafia_room');
+        localStorage.removeItem('mafia_name');
+        localStorage.removeItem('mafia_isHost');
+        localStorage.removeItem('mafia_pass');
+    }
+
+    function navTo(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    // --- MODALS ---
+    let modalCallback = null;
+    function showCustomAlert(title, text) {
+        document.getElementById('c-modal-title').innerText = title;
+        document.getElementById('c-modal-content').innerHTML = `<p>${text}</p>`;
+        document.getElementById('btn-cancel').style.display = 'none';
+        document.getElementById('btn-confirm').innerText = "OK";
+        document.getElementById('custom-modal').style.display = 'flex';
+        modalCallback = null;
+    }
+    function showCustomConfirm(title, text, callback) {
+        document.getElementById('c-modal-title').innerText = title;
+        document.getElementById('c-modal-content').innerHTML = `<p>${text}</p>`;
+        document.getElementById('btn-cancel').style.display = 'inline-block';
+        document.getElementById('btn-confirm').innerText = "Confirm";
+        document.getElementById('custom-modal').style.display = 'flex';
+        modalCallback = callback;
+    }
+    function closeModal(isConfirmed) {
+        document.getElementById('custom-modal').style.display = 'none';
+        if (modalCallback && isConfirmed) modalCallback();
+    }
+
+    function showWiki() {
+        const content = ROLES_DEF.filter(r => !r.isMeta).map(r => `
+            <div style="background:#111; padding:10px; margin-bottom:5px; border:1px solid #333; text-align:left;">
+                <div style="font-weight:bold; color:var(--${r.faction === 'mafia' ? 'accent-red' : (r.faction === 'villager' ? 'villager' : 'neutral')})">
+                    ${r.icon} ${r.name}
+                </div>
+                <div style="font-size:12px; color:#aaa;">${r.desc}</div>
+            </div>
+        `).join('');
+        
+        document.getElementById('c-modal-title').innerText = "Role Wiki";
+        document.getElementById('c-modal-content').innerHTML = content;
+        document.getElementById('btn-cancel').style.display = 'none';
+        document.getElementById('btn-confirm').innerText = "Close";
+        document.getElementById('custom-modal').style.display = 'flex';
+        modalCallback = null;
+    }
+
+    function showGraveyard() {
+        db.ref(`rooms/${myRoom}/players`).once('value', snap => {
+            const players = snap.val() || {};
+            const dead = Object.values(players).filter(p => !p.alive && !p.isHost);
+            let content = "";
+            if(dead.length === 0) content = "No deaths yet.";
+            else {
+                content = dead.map(p => {
+                    const rData = ROLES_DEF.find(r => r.id === p.role) || {name:'?'};
+                    return `<div style="padding:5px; border-bottom:1px solid #333;">
+                        <span style="color:#666; text-decoration:line-through;">${p.name}</span> - 
+                        <span style="color:#aaa;">${rData.name}</span>
+                    </div>`;
+                }).join('');
+            }
+            document.getElementById('c-modal-title').innerText = "Graveyard";
+            document.getElementById('c-modal-content').innerHTML = content;
+            document.getElementById('btn-cancel').style.display = 'none';
+            document.getElementById('btn-confirm').innerText = "Close";
+            document.getElementById('custom-modal').style.display = 'flex';
+        });
+    }
+
+    // --- ROLE SELECTOR ---
+    function renderRoleList() {
+        const list = document.getElementById('role-list');
+        list.innerHTML = '';
+        let total = 0;
+
+        const cats = [
+            { id: 'mafia', label: 'MAFIA', color: 'var(--accent-red)' },
+            { id: 'town', label: 'TOWN', color: 'var(--villager)' },
+            { id: 'neutral', label: 'NEUTRAL', color: 'var(--neutral)' }
+        ];
+
+        cats.forEach(cat => {
+            const header = document.createElement('div');
+            header.className = 'role-header';
+            header.style.color = cat.color;
+            header.innerText = cat.label;
+            list.appendChild(header);
+
+            ROLES_DEF.filter(r => r.cat === cat.id && !r.isMeta).forEach(role => {
+                const count = selectedRoles[role.id] || 0;
+                total += count;
+
+                const div = document.createElement('div');
+                div.className = 'role-row';
+                div.innerHTML = `
+                    <div class="info-icon" onclick="showCustomAlert('${role.name}', '${role.desc}')">i</div>
+                    <div class="role-name" style="color:${cat.color}">${role.name}</div>
+                    <div class="role-controls">
+                        <button class="ctrl-btn" onclick="updateRole('${role.id}', -1)">-</button>
+                        <span id="cnt-${role.id}" style="width:20px; text-align:center">${count}</span>
+                        <button class="ctrl-btn" onclick="updateRole('${role.id}', 1)">+</button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        });
+        document.getElementById('total-role-count').innerText = total + " Selected";
+    }
+
+    function updateRole(id, change) {
+        if(!selectedRoles[id]) selectedRoles[id] = 0;
+        selectedRoles[id] += change;
+        if(selectedRoles[id] < 0) selectedRoles[id] = 0;
+        document.getElementById(`cnt-${id}`).innerText = selectedRoles[id];
+        updateTotalCount();
+    }
+
+    function updateTotalCount() {
+        let total = 0;
+        Object.values(selectedRoles).forEach(c => total += c);
+        document.getElementById('total-role-count').innerText = total + " Selected";
+    }
+
+    function resetRoles() { selectedRoles = {}; renderRoleList(); }
+
+    function randomizeRoles() {
+        const n = parseInt(document.getElementById('random-count').value);
+        if(!n || n < 3) return showCustomAlert("Error", "Min 3 players");
+        resetRoles();
+        
+        let m = Math.max(1, Math.floor(n/4));
+        let neut = Math.floor(n/6);
+        let t = n - m - neut;
+
+        selectedRoles['mafia'] = Math.floor(m * 0.7);
+        if(m - selectedRoles['mafia'] > 0) selectedRoles['godfather'] = 1;
+        selectedRoles['doctor'] = 1;
+        selectedRoles['detective'] = 1;
+        selectedRoles['villager'] = Math.max(0, t - 2);
+        if(neut > 0) selectedRoles['serialkiller'] = 1;
+
+        renderRoleList();
+    }
+
+    // --- TIMER LOGIC ---
+    function startTimer() {
+        // Reset to 60s
+        db.ref(`rooms/${myRoom}/timer`).set(60);
+    }
+    function modTimer(sec) {
+        db.ref(`rooms/${myRoom}/timer`).once('value', snap => {
+            let val = snap.val() || 0;
+            val += sec;
+            if(val < 0) val = 0;
+            db.ref(`rooms/${myRoom}/timer`).set(val);
+        });
+    }
+
+    // --- GAME ACTIONS ---
+    function createGame() {
+        const roomName = document.getElementById('host-room').value.trim().toUpperCase();
+        const pass = document.getElementById('host-pass').value.trim();
+        if(!roomName || !pass) return showCustomAlert("Error", "Missing Room/Pass");
+
+        let total = 0;
+        Object.values(selectedRoles).forEach(c => total += c);
+        if(total === 0) return showCustomAlert("Error", "Select Roles");
+
+        localStorage.setItem('mafia_room', roomName);
+        localStorage.setItem('mafia_name', 'HOST');
+        localStorage.setItem('mafia_isHost', 'true');
+        localStorage.setItem('mafia_pass', pass);
+
+        myRoom = roomName;
+        myName = 'HOST';
+        isHost = true;
+
+        const players = { 'HOST': { name: 'Host', role: 'moderator', alive: true, isHost: true } };
+
+        db.ref('rooms/' + roomName).set({
+            password: pass,
+            status: 'lobby',
+            selectedRoles: selectedRoles,
+            players: players,
+            currentRole: 'LOBBY',
+            currentDesc: 'Waiting for host...',
+            timer: 0
+        });
+
+        listenToRoom(roomName);
+        navTo('screen-lobby');
+        document.getElementById('host-controls').classList.remove('hidden');
+        document.getElementById('player-lobby-controls').classList.add('hidden');
+        document.getElementById('lobby-title').innerText = roomName;
+    }
+
+    function joinGame() {
+        const roomName = document.getElementById('join-room').value.trim().toUpperCase();
+        const pass = document.getElementById('join-pass').value.trim();
+        const name = document.getElementById('join-name').value.trim();
+
+        if(!roomName || !pass || !name) return showCustomAlert("Error", "Fill all fields");
+
+        db.ref('rooms/' + roomName).once('value', snapshot => {
+            if(!snapshot.exists()) return showCustomAlert("Error", "Room not found");
+            const data = snapshot.val();
+            if(data.password !== pass) return showCustomAlert("Error", "Wrong Password");
+
+            const playerExists = data.players && data.players[name];
+            if(playerExists && data.players[name].isOnline) {
+                return showCustomAlert("Error", "Name taken & online.");
+            }
+
+            localStorage.setItem('mafia_room', roomName);
+            localStorage.setItem('mafia_name', name);
+            localStorage.setItem('mafia_isHost', 'false');
+            localStorage.setItem('mafia_pass', pass);
+
+            myRoom = roomName;
+            myName = name;
+            isHost = false;
+
+            const updates = {
+                name: name,
+                isHost: false,
+                alive: true,
+                isOnline: true
+            };
+            if(!playerExists) updates.role = 'pending';
+            else updates.role = data.players[name].role;
+
+            db.ref(`rooms/${roomName}/players/${name}`).update(updates);
+            db.ref(`rooms/${roomName}/players/${name}`).onDisconnect().update({ isOnline: false });
+
+            listenToRoom(roomName);
+            navTo('screen-lobby');
+            document.getElementById('host-controls').classList.add('hidden');
+            document.getElementById('player-lobby-controls').classList.remove('hidden');
+            document.getElementById('lobby-title').innerText = roomName;
+        });
+    }
+
+    function listenToRoom(roomName) {
+        db.ref(`rooms/${roomName}`).on('value', snapshot => {
+            const data = snapshot.val();
+            if(!data) {
+                clearStorage();
+                navTo('screen-home');
+                return;
+            }
+
+            // Timer sync
+            const time = data.timer || 0;
+            const fmt = new Date(time * 1000).toISOString().substr(14, 5);
+            document.getElementById('player-timer').innerText = fmt;
+            document.getElementById('host-timer').innerText = fmt;
+
+            // Host Timer Loop (Only host manages decrements)
+            if(isHost) {
+                if(time > 0 && !timerInterval) {
+                    timerInterval = setInterval(() => {
+                        db.ref(`rooms/${myRoom}/timer`).transaction(curr => (curr && curr > 0) ? curr - 1 : 0);
+                    }, 1000);
+                } else if(time <= 0 && timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+            }
+
+            // Lobby List
+            const players = data.players || {};
+            const playerNames = Object.keys(players).filter(n => !players[n].isHost);
+            document.getElementById('lobby-player-count').innerText = `Players: ${playerNames.length}`;
+            
+            const list = document.getElementById('lobby-list');
+            list.innerHTML = '';
+            playerNames.forEach(n => {
+                const p = players[n];
+                const div = document.createElement('div');
+                div.className = 'player-item';
+                const icon = p.isOnline 
+                    ? '<div class="status-dot online"></div>' 
+                    : '<div class="status-icon-offline" title="Disconnected">⚠️</div>';
+                div.innerHTML = `<span>${p.name}</span> ${icon}`;
+                list.appendChild(div);
+            });
+
+            // Routing
+            if(data.status === 'game' || data.status.startsWith('won_')) {
+                if(isHost) {
+                    navTo('screen-host');
+                    updateHostUI(data, players);
+                } else {
+                    navTo('screen-player');
+                    updatePlayerUI(players[myName], data);
+                }
+                
+                if(data.status.startsWith('won_')) {
+                    const w = data.status.split('_')[1];
+                    document.getElementById('win-title-text').innerText = w + " WINS";
+                    document.getElementById('global-win-overlay').classList.add('active');
+                    document.getElementById(isHost ? 'win-dismiss-host' : 'win-dismiss-player').style.display = 'block';
+                }
+            }
+        });
+    }
+
+    // --- HOST GAME LOGIC ---
+    function startGame() {
+        db.ref(`rooms/${myRoom}`).once('value', snap => {
+            const data = snap.val();
+            const playersObj = data.players;
+            const playerNames = Object.keys(playersObj).filter(n => !playersObj[n].isHost);
+            
+            let deck = [];
+            Object.keys(data.selectedRoles).forEach(rid => {
+                for(let i=0; i<data.selectedRoles[rid]; i++) deck.push(rid);
+            });
+
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            let updates = {};
+            let rolesInGame = new Set();
+            
+            playerNames.forEach((name, idx) => {
+                let role = deck[idx] || 'villager';
+                updates[`players/${name}/role`] = role;
+                updates[`players/${name}/alive`] = true;
+                updates[`players/${name}/abilityUsed`] = false;
+                
+                // Init Ammo
+                const rDef = ROLES_DEF.find(r=>r.id===role);
+                if(rDef) {
+                    if(rDef.ammo) updates[`players/${name}/ammo`] = rDef.ammo;
+                    if(rDef.ammo2) updates[`players/${name}/ammo2`] = rDef.ammo2;
+                }
+
+                rolesInGame.add(role);
+            });
+
+            updates['status'] = 'game';
+            updates['nightIndex'] = -1;
+
+            db.ref(`rooms/${myRoom}`).update(updates).then(() => {
+                nextPhase();
+            });
+        });
+    }
+
+    function getNightSequence(players) {
+        let rolesInGame = new Set();
+        let hasMafia = false;
+        Object.values(players).forEach(p => {
+            if(!p.isHost) {
+                rolesInGame.add(p.role);
+                const rd = ROLES_DEF.find(r=>r.id===p.role);
+                if(rd && rd.faction==='mafia') hasMafia = true;
+            }
+        });
+
+        let seq = ROLES_DEF.filter(r => (rolesInGame.has(r.id) || (r.id === 'mafia_all' && hasMafia)) && r.priority < 90);
+        return seq.sort((a,b) => a.priority - b.priority);
+    }
+
+    function nextPhase() {
+        db.ref(`rooms/${myRoom}`).once('value', snap => {
+            const data = snap.val();
+            let idx = data.nightIndex !== undefined ? data.nightIndex : -1;
+            const seq = getNightSequence(data.players);
+
+            idx++;
+            let update = { nightIndex: idx };
+
+            if(idx >= seq.length) {
+                update.currentRole = 'MORNING';
+                update.currentDesc = 'Discuss and Vote. Sun is up.';
+                update.nightIndex = -1; 
+            } else {
+                update.currentRole = seq[idx].name;
+                update.currentDesc = seq[idx].desc;
+            }
+            db.ref(`rooms/${myRoom}`).update(update);
+        });
+    }
+
+    function updateHostUI(data, players) {
+        document.getElementById('host-current-role').innerText = data.currentRole;
+        document.getElementById('host-role-desc').innerText = data.currentDesc;
+
+        const list = document.getElementById('host-player-list');
+        list.innerHTML = '';
+        Object.values(players).forEach(p => {
+            if(p.isHost) return;
+            const rData = ROLES_DEF.find(r => r.id === p.role) || {name:'?',faction:'?'};
+            const div = document.createElement('div');
+            div.className = 'player-item';
+            div.style.flexDirection = 'column';
+            div.style.alignItems = 'flex-start';
+            
+            let color = '#888';
+            if(rData.faction === 'mafia') color = 'var(--accent-red)';
+            else if(rData.faction === 'villager') color = 'var(--villager)';
+            else if(rData.faction === 'neutral') color = 'var(--neutral)';
+
+            const deadStyle = !p.alive ? 'text-decoration:line-through; opacity:0.6' : '';
+            const usedTxt = p.abilityUsed ? '<span style="color:var(--accent-red); font-weight:bold;">(ACT)</span>' : '';
+
+            let controls = `
+                <div class="host-actions-row">
+                    <button class="tiny-btn ${p.alive ? 'secondary' : 'outline'}" onclick="toggleLife('${p.name}', ${p.alive})">${p.alive?'KILL':'REV'}</button>
+            `;
+            
+            // Executioner -> Jester
+            if(p.role === 'executioner') {
+                controls += `<button class="tiny-btn outline" onclick="toggleRole('${p.name}', 'jester')">To Jester</button>`;
+            } else if (p.role === 'jester') {
+                controls += `<button class="tiny-btn outline" onclick="toggleRole('${p.name}', 'executioner')">To Exe</button>`;
+            }
+
+            // Ammo Controls
+            if(rData.ammo) {
+                controls += `
+                    <div style="display:flex; align-items:center; background:#222; border-radius:3px;">
+                        <span style="font-size:9px; padding:0 4px; color:#aaa;">U1:${p.ammo||0}</span>
+                        <button class="tiny-btn" style="padding:2px 5px; margin:0;" onclick="adjustAmmo('${p.name}','ammo',-1)">-</button>
+                        <button class="tiny-btn" style="padding:2px 5px; margin:0;" onclick="adjustAmmo('${p.name}','ammo',1)">+</button>
+                    </div>
+                `;
+            }
+            if(rData.ammo2) { // Surgeon second slot
+                controls += `
+                    <div style="display:flex; align-items:center; background:#222; border-radius:3px;">
+                        <span style="font-size:9px; padding:0 4px; color:#9b59b6;">U2:${p.ammo2||0}</span>
+                        <button class="tiny-btn" style="padding:2px 5px; margin:0;" onclick="adjustAmmo('${p.name}','ammo2',-1)">-</button>
+                        <button class="tiny-btn" style="padding:2px 5px; margin:0;" onclick="adjustAmmo('${p.name}','ammo2',1)">+</button>
+                    </div>
+                `;
+            }
+
+            controls += `</div>`;
+
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; width:100%;">
+                    <span style="font-weight:bold; color:white; ${deadStyle}">${p.name}</span>
+                    <span style="font-size:10px; color:${color};">${rData.name} ${usedTxt}</span>
+                </div>
+                ${controls}
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    function toggleLife(name, alive) { db.ref(`rooms/${myRoom}/players/${name}/alive`).set(!alive); }
+    function toggleRole(name, newRole) { db.ref(`rooms/${myRoom}/players/${name}/role`).set(newRole); }
+    function adjustAmmo(name, field, amount) {
+        db.ref(`rooms/${myRoom}/players/${name}/${field}`).transaction(val => (val||0) + amount);
+    }
+    
+    function attemptWin(who) {
+        showCustomConfirm("End Game", `${who} Wins?`, () => {
+            db.ref(`rooms/${myRoom}`).update({
+                status: `won_${who}`,
+                currentRole: 'GAME OVER',
+                currentDesc: `${who} Wins`
+            });
+        });
+    }
+
+    // --- PLAYER UI ---
+    function updatePlayerUI(me, data) {
+        if(!me) return;
+        
+        const deadOverlay = document.getElementById('death-overlay');
+        if(!me.alive) deadOverlay.classList.add('is-dead');
+        else deadOverlay.classList.remove('is-dead');
+
+        const rData = ROLES_DEF.find(r => r.id === me.role);
+        if(rData) {
+            const nameEl = document.getElementById('my-role-name');
+            nameEl.innerText = rData.name;
+            if(rData.faction==='mafia') nameEl.style.color = 'var(--accent-red)';
+            else if(rData.faction==='villager') nameEl.style.color = 'var(--villager)';
+            else nameEl.style.color = 'var(--neutral)';
+            
+            document.getElementById('my-role-type').innerText = rData.type;
+            document.getElementById('my-role-desc').innerText = rData.desc;
+            document.getElementById('role-bg-icon').innerText = rData.icon;
+
+            // Ability Buttons
+            const btn = document.getElementById('ability-btn');
+            const surg = document.getElementById('surgeon-controls');
+            const ammoDisplay = document.getElementById('ammo-count');
+
+            btn.classList.add('hidden');
+            surg.classList.add('hidden');
+            ammoDisplay.classList.add('hidden');
+
+            if(me.alive && !data.status.startsWith('won')) {
+                // Show standard button?
+                if(rData.type !== 'Passive' && me.role !== 'surgeon') {
+                    btn.classList.remove('hidden');
+                    if(me.abilityUsed) {
+                        btn.classList.add('active');
+                        btn.innerText = "ABILITY ACTIVE";
+                    } else {
+                        btn.classList.remove('active');
+                        btn.innerText = "USE ABILITY";
+                    }
+                }
+                
+                // Surgeon Buttons
+                if(me.role === 'surgeon') {
+                    surg.classList.remove('hidden');
+                    const healBtn = document.getElementById('btn-surg-heal');
+                    const killBtn = document.getElementById('btn-surg-kill');
+                    healBtn.innerText = `Heal (${me.ammo||0})`;
+                    killBtn.innerText = `Poison (${me.ammo2||0})`;
+                    if(me.ammo <= 0) healBtn.style.opacity = 0.3; else healBtn.style.opacity = 1;
+                    if(me.ammo2 <= 0) killBtn.style.opacity = 0.3; else killBtn.style.opacity = 1;
+                }
+
+                // Generic Ammo Display
+                if(rData.ammo && me.role !== 'surgeon') {
+                    ammoDisplay.classList.remove('hidden');
+                    ammoDisplay.innerText = `USES LEFT: ${me.ammo}`;
+                    if(me.ammo <= 0) btn.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    function toggleAbility() {
+        // Simple toggle for standard roles. For limited roles, it decrements.
+        db.ref(`rooms/${myRoom}/players/${myName}`).once('value', snap => {
+            const p = snap.val();
+            const rData = ROLES_DEF.find(r => r.id === p.role);
+            
+            // If limited ammo
+            if(rData.ammo) {
+                if(!p.abilityUsed) {
+                     if(p.ammo > 0) {
+                        db.ref(`rooms/${myRoom}/players/${myName}`).update({ abilityUsed: true, ammo: p.ammo - 1 });
+                     }
+                } else {
+                    // Toggle off (give back ammo? usually yes in this simple UI implementation to allow correction)
+                    db.ref(`rooms/${myRoom}/players/${myName}`).update({ abilityUsed: false, ammo: p.ammo + 1 });
+                }
+            } else {
+                db.ref(`rooms/${myRoom}/players/${myName}/abilityUsed`).set(!p.abilityUsed);
+            }
+        });
+    }
+
+    function useSurgeon(type) {
+        db.ref(`rooms/${myRoom}/players/${myName}`).once('value', snap => {
+            const p = snap.val();
+            if(type === 'heal' && p.ammo > 0) {
+                 db.ref(`rooms/${myRoom}/players/${myName}/ammo`).set(p.ammo - 1);
+                 showCustomAlert("Action", "Heal Used");
+            } else if(type === 'kill' && p.ammo2 > 0) {
+                 db.ref(`rooms/${myRoom}/players/${myName}/ammo2`).set(p.ammo2 - 1);
+                 showCustomAlert("Action", "Poison Used");
+            }
+        });
+    }
+
+    function confirmDeleteRoom() {
+        showCustomConfirm("Close Room", "End session for everyone?", () => {
+             db.ref(`rooms/${myRoom}`).remove();
+             clearStorage();
+             navTo('screen-home');
+        });
+    }
+
+    function leaveLobby() {
+        if(myRoom && myName) {
+            db.ref(`rooms/${myRoom}/players/${myName}`).remove();
+        }
+        clearStorage();
+        navTo('screen-home');
+    }
+
+    function closeWinOverlayHost() {
+        db.ref(`rooms/${myRoom}`).remove();
+        clearStorage();
+        window.location.reload();
+    }
+    function closeWinOverlayPlayer() {
+        leaveLobby();
+    }
+    function editRoles() { navTo('screen-create'); }
+
+    renderRoleList();
+</script>
+</body>
+</html>
